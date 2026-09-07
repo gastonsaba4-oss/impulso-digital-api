@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cargando...</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Space+Grotesk:wght@500;700&family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style id="baseStyle">
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:Inter,sans-serif;background:#11141a;color:#eef0f4;}
+  #loadingMsg{min-height:100vh;display:flex;align-items:center;justify-content:center;font-size:15px;color:#8c92a4;text-align:center;padding:24px;}
+</style>
+<style id="tplStyle"></style>
+</head>
+<body>
+
+<div id="loadingMsg">Cargando página...</div>
+
+<div id="pageRoot" style="display:none">
+  <header class="hero">
+    <img id="siteLogo" class="site-logo" alt="logo">
+    <h1 id="siteName">Tu negocio</h1>
+    <p id="siteTagline" style="display:none"></p>
+    <div class="social-row" id="socialRow"></div>
+  </header>
+  <div class="cat-filter" id="catFilter"></div>
+  <main class="catalog" id="catalogWrap"></main>
+  <footer>Página generada con Impulso Digital<br><button class="admin-link" onclick="openAdminLogin()">Panel del negocio</button></footer>
+
+  <div class="cart-bar" id="cartBar" style="display:none">
+    <span id="cartSummary">0 items · $0</span>
+    <button onclick="openCart()" id="cartOpenBtn">Tu pedido</button>
+  </div>
+  <div class="cart-drawer" id="cartDrawer">
+    <div class="cart-panel">
+      <button class="close-cart" onclick="closeCart()">Cerrar</button>
+      <h3 id="cartTitleEl">Tu pedido</h3>
+      <div id="cartLines"></div>
+      <div class="cart-total"><span>Total</span><span id="cartTotalVal">$0</span></div>
+      <button class="wa-send" onclick="sendWA()" id="sendWaBtn">Enviar pedido por WhatsApp</button>
+    </div>
+  </div>
+
+  <div class="modal-ov" id="adminLoginModal">
+    <div class="modal-box">
+      <button class="close-cart" onclick="closeAdminLogin()">Cerrar</button>
+      <h3>Acceso del negocio</h3>
+      <div class="f-a"><label>Usuario</label><input id="admU"></div>
+      <div class="f-a"><label>Contraseña</label><input id="admP" type="password"></div>
+      <button class="wa-send" onclick="tryAdminLogin()">Entrar</button>
+      <p class="err-msg" id="admErr">Usuario o contraseña incorrectos.</p>
+    </div>
+  </div>
+
+  <div class="modal-ov" id="adminHubModal">
+    <div class="modal-box">
+      <button class="close-cart" onclick="closeAdminHub()">Cerrar</button>
+      <h3 id="hubTitle">Panel de tu negocio</h3>
+      <button class="hub-btn" onclick="openAdminBiz()">Datos del negocio (logo, textos, WhatsApp, redes)</button>
+      <button class="hub-btn" onclick="openCatalog()" id="hubCatalogBtn">Catálogo</button>
+      <button class="hub-btn" onclick="closeAdminHub()">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <div class="modal-ov" id="adminBizModal">
+    <div class="modal-box">
+      <button class="close-cart" onclick="closeAdminBiz()">Volver</button>
+      <h3>Datos del negocio</h3>
+      <img id="logoPreview" class="logo-preview" alt="logo">
+      <input type="hidden" id="logoValue">
+      <div class="f-a"><label>Subir logo (imagen)</label><input type="file" accept="image/*" onchange="onLogoFile(this)"></div>
+      <div class="f-a"><label>o pegar URL del logo</label><input id="edLogoUrl" oninput="onLogoUrl(this.value)" placeholder="https://..."></div>
+      <div class="f-a"><label>Nombre del negocio</label><input id="edName"></div>
+      <div class="f-a"><label>Texto / frase corta</label><input id="edTagline"></div>
+      <div class="f-a"><label>Correo electrónico</label><input id="edEmail"></div>
+      <div class="f-a"><label>WhatsApp (con código de país, sin +)</label><input id="edWhats"></div>
+      <div class="f-a"><label>Instagram (usuario)</label><input id="edInsta"></div>
+      <div class="f-a"><label>Facebook (usuario o página)</label><input id="edFb"></div>
+      <div class="f-a"><label>TikTok (usuario)</label><input id="edTiktok"></div>
+      <button class="wa-send" onclick="saveBizEdits()">Guardar cambios</button>
+    </div>
+  </div>
+
+  <div class="modal-ov" id="catalogModal">
+    <div class="modal-box">
+      <button class="close-cart" onclick="closeCatalog()">Volver</button>
+      <h3>Categorías</h3>
+      <div class="cat-manage" id="catManageList"></div>
+      <div class="cat-add-row"><input id="newCatInput" placeholder="Nueva categoría"><button onclick="addCategory()">Agregar</button></div>
+      <h3 id="catalogListTitle">Tus productos</h3>
+      <div id="prodList"></div>
+      <button class="wa-send" onclick="openItemForm(null)" id="addItemBtn">+ Agregar</button>
+    </div>
+  </div>
+
+  <div class="modal-ov" id="itemFormModal">
+    <div class="modal-box">
+      <button class="close-cart" onclick="closeItemForm()">Cerrar</button>
+      <h3 id="itemFormTitle">Nuevo</h3>
+      <div class="f-a"><label>Nombre</label><input id="itName"></div>
+      <div class="f-a"><label>Categoría</label><select id="itCatSelect" onchange="onItCatChange()"></select></div>
+      <div class="f-a" id="itNewCatWrap" style="display:none"><label>Nombre de la nueva categoría</label><input id="itNewCat"></div>
+      <div class="f-a"><label>Precio (ARS)</label><input id="itPrice" type="number"></div>
+      <div class="f-a"><label>Descripción</label><textarea id="itDesc"></textarea></div>
+      <div class="f-a"><label>Imágenes</label>
+        <div class="img-thumbs" id="itImgThumbs"></div>
+        <input type="file" accept="image/*" onchange="onItemImageFile(this)">
+        <div class="url-add-row"><input id="itImgUrl" placeholder="https://... URL de imagen"><button onclick="addItemImageUrl()">Agregar</button></div>
+      </div>
+      <button class="wa-send" onclick="saveItemForm()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= 20 plantillas (mismas definiciones que en el panel) ================= */
+var TEMPLATES = [
+  { id:1, name:'Estudio Minimal', layout:'stacked', vars:{bg:'#faf9f6',surface:'#ffffff',text:'#1c1c1c',muted:'#767268',accent:'#1c1c1c',accent2:'#b08d57',radius:'2px',fontHead:"'Playfair Display',serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #e4e1d8'} },
+  { id:2, name:'Mercado Vivo', layout:'grid', vars:{bg:'#fff7e6',surface:'#ffffff',text:'#241a00',muted:'#8a6d1f',accent:'#ff5a1f',accent2:'#ffb020',radius:'14px',fontHead:"'Space Grotesk',sans-serif",fontBody:"Inter,sans-serif",cardBorder:'2px solid #241a00'} },
+  { id:3, name:'Boutique Elegante', layout:'split', vars:{bg:'#0e0e10',surface:'#17171a',text:'#f3ede2',muted:'#a49b8a',accent:'#cba135',accent2:'#8a7440',radius:'2px',fontHead:"'Playfair Display',serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #2a2a2e'} },
+  { id:4, name:'Verde Natural', layout:'stacked', vars:{bg:'#f3f2e9',surface:'#ffffff',text:'#26331f',muted:'#6c7a5e',accent:'#54724a',accent2:'#c98a4b',radius:'22px',fontHead:"'Poppins',sans-serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #dcdcc9'} },
+  { id:5, name:'Oferta Relámpago', layout:'grid', vars:{bg:'#12100e',surface:'#1c1916',text:'#fff4e6',muted:'#c9b8a4',accent:'#ffcf3f',accent2:'#ff4d4d',radius:'8px',fontHead:"'Space Grotesk',sans-serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #322b23'} },
+  { id:6, name:'Servicio Premium', layout:'split', vars:{bg:'#0d1520',surface:'#132033',text:'#eaf1fb',muted:'#8fa3bd',accent:'#5ea1ff',accent2:'#9fd6c8',radius:'6px',fontHead:"'Poppins',sans-serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #1e2f45'} },
+  { id:7, name:'Pastel Suave', layout:'stacked', vars:{bg:'#fdf1f5',surface:'#ffffff',text:'#3d2b34',muted:'#8f7480',accent:'#d97ea3',accent2:'#7fb9c4',radius:'26px',fontHead:"'Poppins',sans-serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #f4dce6'} },
+  { id:8, name:'Urbano Neón', layout:'split', vars:{bg:'#0a0a0f',surface:'#131320',text:'#f2f2ff',muted:'#8f8fb0',accent:'#39ffc7',accent2:'#ff3ec9',radius:'4px',fontHead:"'Space Grotesk',sans-serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #23233a'} },
+  { id:9, name:'Artesanal Cálido', layout:'stacked', vars:{bg:'#f4ead9',surface:'#fffaf1',text:'#3a2a1c',muted:'#8a6f56',accent:'#b5562d',accent2:'#7a8f5c',radius:'14px',fontHead:"'Playfair Display',serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #e3d2b6'} },
+  { id:10,name:'Corporativo Claro', layout:'grid', vars:{bg:'#f4f6fa',surface:'#ffffff',text:'#101828',muted:'#5c6373',accent:'#2455ff',accent2:'#0fb88a',radius:'4px',fontHead:"'Poppins',sans-serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #dfe3ea'} },
+  { id:11,name:'Café & Repostería', layout:'stacked', vars:{bg:'#f6ede1',surface:'#fffaf3',text:'#3c2a1e',muted:'#8a705c',accent:'#7a4a2b',accent2:'#c99a4a',radius:'18px',fontHead:"'Playfair Display',serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #e6d4bd'} },
+  { id:12,name:'Tech Fresh', layout:'grid', vars:{bg:'#f5f6fb',surface:'#ffffff',text:'#12131a',muted:'#666b7d',accent:'#5b4bff',accent2:'#00c2b3',radius:'16px',fontHead:"'Space Grotesk',sans-serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #e3e4f0'} },
+  { id:13,name:'Fitness Bold', layout:'split', vars:{bg:'#0b0b0c',surface:'#161616',text:'#f5f5f5',muted:'#9a9a9a',accent:'#ff2d2d',accent2:'#f5f5f5',radius:'2px',fontHead:"'Space Grotesk',sans-serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #2a2a2a'} },
+  { id:14,name:'Farmacia & Salud', layout:'grid', vars:{bg:'#f1fbf9',surface:'#ffffff',text:'#0d2c28',muted:'#5c7d78',accent:'#0f9d84',accent2:'#3fb6ff',radius:'10px',fontHead:"'Poppins',sans-serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #d7ece8'} },
+  { id:15,name:'Joyería Fina', layout:'split', vars:{bg:'#0c0c0d',surface:'#141415',text:'#f2ece0',muted:'#a89f8e',accent:'#e6c48a',accent2:'#b98d5a',radius:'0px',fontHead:"'Playfair Display',serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #29271f'} },
+  { id:16,name:'Ferretería Industrial', layout:'grid', vars:{bg:'#f7f5ee',surface:'#ffffff',text:'#1c1a12',muted:'#6b664f',accent:'#ffcc00',accent2:'#1c1a12',radius:'4px',fontHead:"'Space Grotesk',sans-serif",fontBody:"Inter,sans-serif",cardBorder:'2px solid #1c1a12'} },
+  { id:17,name:'Juguetería Feliz', layout:'stacked', vars:{bg:'#fff8ee',surface:'#ffffff',text:'#241c3a',muted:'#7a7295',accent:'#ff5da2',accent2:'#3fc4ff',radius:'24px',fontHead:"'Poppins',sans-serif",fontBody:"Inter,sans-serif",cardBorder:'2px solid #ffe1ef'} },
+  { id:18,name:'Inmobiliaria Clásica', layout:'split', vars:{bg:'#f3f1ea',surface:'#ffffff',text:'#1f2a3a',muted:'#66707f',accent:'#1f3a5f',accent2:'#a68a54',radius:'2px',fontHead:"'Playfair Display',serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #dcd8cb'} },
+  { id:19,name:'Fiestas & Eventos', layout:'grid', vars:{bg:'#150d24',surface:'#20142f',text:'#f6ecff',muted:'#b6a3d1',accent:'#e63cff',accent2:'#ffd23c',radius:'18px',fontHead:"'Space Grotesk',sans-serif",fontBody:"Inter,sans-serif",cardBorder:'1px solid #37244a'} },
+  { id:20,name:'Mascotas Amigables', layout:'stacked', vars:{bg:'#fff3e8',surface:'#ffffff',text:'#3a2c1c',muted:'#8a7660',accent:'#ff8a3d',accent2:'#5fb87a',radius:'20px',fontHead:"'Poppins',sans-serif",fontBody:"Inter,sans-serif
