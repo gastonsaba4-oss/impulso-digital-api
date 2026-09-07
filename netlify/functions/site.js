@@ -1,6 +1,8 @@
 const { getStore, connectLambda } = require('@netlify/blobs');
 const crypto = require('crypto');
 
+const INDEX_KEY = '__index__';
+
 function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
@@ -25,6 +27,11 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
+function checkAdmin(event) {
+  const adminKey = event.headers['x-admin-key'] || event.headers['X-Admin-Key'];
+  return !!process.env.ADMIN_KEY && adminKey === process.env.ADMIN_KEY;
+}
+
 exports.handler = async (event) => {
   connectLambda(event);
   const store = getStore('impulso-sites');
@@ -33,9 +40,21 @@ exports.handler = async (event) => {
     return { statusCode: 204, headers: corsHeaders(), body: '' };
   }
 
-  // ---------- LEER datos públicos de una página ----------
+  // ---------- GET ----------
   if (event.httpMethod === 'GET') {
-    const id = (event.queryStringParameters || {}).id;
+    const qs = event.queryStringParameters || {};
+
+    // listado de clientes, protegido con la clave admin (lo usa el panel)
+    if (qs.list === '1') {
+      if (!checkAdmin(event)) {
+        return { statusCode: 401, headers: corsHeaders(), body: JSON.stringify({ error: 'No autorizado' }) };
+      }
+      const index = (await store.get(INDEX_KEY, { type: 'json' })) || [];
+      return { statusCode: 200, headers: corsHeaders(), body: JSON.stringify({ clients: index }) };
+    }
+
+    // datos públicos de una página (lo usa page.html)
+    const id = qs.id;
     if (!id) {
       return { statusCode: 400, headers: corsHeaders(), body: JSON.stringify({ error: 'Falta id' }) };
     }
@@ -62,10 +81,9 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: corsHeaders(), body: JSON.stringify({ error: 'Faltan datos' }) };
   }
 
-  // ---------- CREAR / REGISTRAR una página (la llama tu panel) ----------
+  // ---------- CREAR / ACTUALIZAR una página (la llama el panel) ----------
   if (action === 'create') {
-    const adminKey = event.headers['x-admin-key'] || event.headers['X-Admin-Key'];
-    if (!process.env.ADMIN_KEY || adminKey !== process.env.ADMIN_KEY) {
+    if (!checkAdmin(event)) {
       return { statusCode: 401, headers: corsHeaders(), body: JSON.stringify({ error: 'No autorizado' }) };
     }
     const existing = await store.get(id, { type: 'json' });
@@ -77,6 +95,30 @@ exports.handler = async (event) => {
       data: Object.assign({}, existing ? existing.data : {}, body.data || {})
     };
     await store.setJSON(id, record);
+
+    // actualizamos el índice para que el panel pueda listar clientes
+    const index = (await store.get(INDEX_KEY, { type: 'json' })) || [];
+    const i = index.findIndex(function (c) { return c.id === id; });
+    const entry = {
+      id: id,
+      businessName: record.data.businessName || '',
+      template: record.data.template || 1,
+      pageType: record.data.pageType || 'producto'
+    };
+    if (i >= 0) { index[i] = entry; } else { index.push(entry); }
+    await store.setJSON(INDEX_KEY, index);
+
+    return { statusCode: 200, headers: corsHeaders(), body: JSON.stringify({ ok: true }) };
+  }
+
+  // ---------- ELIMINAR una página (la llama el panel) ----------
+  if (action === 'delete') {
+    if (!checkAdmin(event)) {
+      return { statusCode: 401, headers: corsHeaders(), body: JSON.stringify({ error: 'No autorizado' }) };
+    }
+    await store.delete(id);
+    const index = (await store.get(INDEX_KEY, { type: 'json' })) || [];
+    await store.setJSON(INDEX_KEY, index.filter(function (c) { return c.id !== id; }));
     return { statusCode: 200, headers: corsHeaders(), body: JSON.stringify({ ok: true }) };
   }
 
@@ -96,6 +138,14 @@ exports.handler = async (event) => {
     }
     record.data = Object.assign({}, record.data, body.data || {});
     await store.setJSON(id, record);
+
+    // si cambió el nombre del negocio, reflejarlo en el índice
+    if (body.data && body.data.businessName !== undefined) {
+      const index = (await store.get(INDEX_KEY, { type: 'json' })) || [];
+      const i = index.findIndex(function (c) { return c.id === id; });
+      if (i >= 0) { index[i].businessName = body.data.businessName; await store.setJSON(INDEX_KEY, index); }
+    }
+
     return { statusCode: 200, headers: corsHeaders(), body: JSON.stringify({ ok: true }) };
   }
 
