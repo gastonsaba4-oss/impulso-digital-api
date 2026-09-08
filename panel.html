@@ -118,7 +118,11 @@
         </div>
         <div class="grid2">
           <div class="field"><label>Correo electrónico (opcional)</label><input id="fEmail" oninput="onFormChange()" placeholder="contacto@negocio.com"></div>
-          <div class="field"><label>Logo inicial (URL de imagen, opcional)</label><input id="fLogo" oninput="onFormChange()" placeholder="https://..."></div>
+          <div class="field"><label>Logo inicial (opcional)</label>
+            <img id="logoPreviewAdmin" style="display:none;max-width:70px;max-height:70px;border-radius:8px;margin-bottom:6px;object-fit:contain;">
+            <input type="file" accept="image/*" onchange="onLogoFileAdmin(this)" style="margin-bottom:6px">
+            <input id="fLogo" oninput="onFormChange()" placeholder="o pegá una URL de imagen">
+          </div>
         </div>
       </div>
 
@@ -127,7 +131,12 @@
         <p class="hint">Con este usuario y contraseña, tu cliente entra al panel de SU página para cargar logo, textos y catálogo.</p>
         <div class="grid2">
           <div class="field"><label>Usuario del cliente</label><input id="fClientUser" oninput="onFormChange()" placeholder="cliente"></div>
-          <div class="field"><label>Contraseña inicial del cliente</label><input id="fClientPass" oninput="onFormChange()" placeholder="clave123"></div>
+          <div class="field"><label>Contraseña del cliente</label>
+            <div style="display:flex;gap:8px;">
+              <input id="fClientPass" oninput="onFormChange()" style="flex:1">
+              <button type="button" class="btn btn-outline" onclick="regenPass()">Generar</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -249,13 +258,23 @@ var TEMPLATES = [
 var clientList = [];
 var current = null;
 
+function genPassword(){
+  return Math.random().toString(36).slice(2,6) + Math.random().toString(36).slice(2,6).toUpperCase();
+}
+function regenPass(){
+  var p = genPassword();
+  document.getElementById('fClientPass').value = p;
+  onFormChange();
+  showToast('Nueva contraseña generada — no te olvides de Guardar cliente');
+}
+
 function blankProject(){
   return {
     id: 'p_' + Date.now(),
     template: 1,
     type: 'producto',
     business: { name:'', tagline:'', whatsapp:'', instagram:'', facebook:'', tiktok:'', email:'', logo:'' },
-    clientAccess: { user:'cliente', pass:'clave123' },
+    clientAccess: { user:'cliente', pass: genPassword() },
     categories: ['Productos','Servicios','Combos','Liquidación'],
     items: [ blankItem() ],
     saved: false
@@ -294,8 +313,18 @@ function renderProjList(){
   clientList.forEach(function(c){
     var div = document.createElement('div');
     div.className = 'proj-item' + (current && current.id === c.id ? ' active' : '');
-    div.onclick = function(){ loadClient(c.id); };
-    div.textContent = c.businessName || '(sin nombre)';
+    var nameSpan = document.createElement('span');
+    nameSpan.textContent = c.businessName || '(sin nombre)';
+    nameSpan.style.cursor = 'pointer';
+    nameSpan.onclick = function(){ loadClient(c.id); };
+    var linkBtn = document.createElement('button');
+    linkBtn.className = 'btn btn-ghost';
+    linkBtn.title = 'Copiar link de esta página';
+    linkBtn.textContent = '🔗';
+    linkBtn.style.padding = '4px 6px';
+    linkBtn.onclick = function(e){ e.stopPropagation(); copyLinkFor(c.id); };
+    div.appendChild(nameSpan);
+    div.appendChild(linkBtn);
     wrap.appendChild(div);
   });
 }
@@ -338,13 +367,28 @@ function renderForm(){
   document.getElementById('fFb').value = current.business.facebook || '';
   document.getElementById('fTiktok').value = current.business.tiktok || '';
   document.getElementById('fEmail').value = current.business.email || '';
-  document.getElementById('fLogo').value = current.business.logo || '';
+  var logoIsUpload = (current.business.logo || '').indexOf('data:') === 0;
+  document.getElementById('fLogo').value = logoIsUpload ? '' : (current.business.logo || '');
+  var logoPrev = document.getElementById('logoPreviewAdmin');
+  if(current.business.logo){ logoPrev.src = current.business.logo; logoPrev.style.display = 'block'; } else { logoPrev.style.display = 'none'; }
   document.getElementById('fClientUser').value = (current.clientAccess && current.clientAccess.user) || '';
   document.getElementById('fClientPass').value = (current.clientAccess && current.clientAccess.pass) || '';
   document.getElementById('fCategories').value = (current.categories || []).join(', ');
   renderItems();
   buildTplGrid();
   if(current.saved){ showLinkBox(); } else { document.getElementById('linkBox').style.display = 'none'; }
+}
+
+function onLogoFileAdmin(input){
+  var file = input.files && input.files[0]; if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    current.business.logo = e.target.result;
+    document.getElementById('fLogo').value = '';
+    var prev = document.getElementById('logoPreviewAdmin');
+    prev.src = e.target.result; prev.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
 }
 
 function onFormChange(){
@@ -357,7 +401,10 @@ function onFormChange(){
   current.business.facebook = document.getElementById('fFb').value.trim();
   current.business.tiktok = document.getElementById('fTiktok').value.replace('@','').trim();
   current.business.email = document.getElementById('fEmail').value.trim();
-  current.business.logo = document.getElementById('fLogo').value.trim();
+  var urlVal = document.getElementById('fLogo').value.trim();
+  if(urlVal){ current.business.logo = urlVal; }
+  var logoPrev2 = document.getElementById('logoPreviewAdmin');
+  if(current.business.logo){ logoPrev2.src = current.business.logo; logoPrev2.style.display = 'block'; } else { logoPrev2.style.display = 'none'; }
   if(!current.clientAccess) current.clientAccess = { user:'', pass:'' };
   current.clientAccess.user = document.getElementById('fClientUser').value.trim();
   current.clientAccess.pass = document.getElementById('fClientPass').value;
@@ -429,6 +476,10 @@ function showLinkBox(){
   document.getElementById('clientLink').textContent = url;
   document.getElementById('linkBox').style.display = 'block';
   document.getElementById('previewFrame').src = url;
+}
+function copyLinkFor(id){
+  var url = clientPageUrl(id);
+  navigator.clipboard.writeText(url).then(function(){ showToast('Link copiado: ' + url); }).catch(function(){ prompt('Copiá este link:', url); });
 }
 function copyLink(){
   var url = clientPageUrl(current.id);
